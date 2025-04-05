@@ -261,11 +261,13 @@ char *load_template_from_file(char *template_name, char *data_raw){
         free(var_name);
         free(var_value);
         curr_pos++;
-        if (data_raw[curr_pos] == '\n'){
+        if (data_raw[curr_pos] == '\n' || data_raw[curr_pos] == '\0'){
             list_size++;
             list = add_variable(list, list_size, curr_var);
             curr_var = NULL;
-            curr_pos++;
+            if (data_raw[curr_pos] == '\n'){
+                curr_pos++;
+            }
         }
     }
     char *template_text = load_file(template_name);

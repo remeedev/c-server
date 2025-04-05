@@ -4,3 +4,5 @@ text:this is a test for a for loop integration with html
 title:test2
 text:both items should be added to the end result of the webpage
 
+title:test3
+text:More information to be added dynamically
