@@ -97,7 +97,7 @@ char* load_html(char* file_name){
 response* gen_response(char *recvd){
     response* out = (response *)malloc(sizeof(response));
     request_header* head = parse_header(recvd);
-    char *out_html = load_html("index.html");
+    char *out_html = load_html("./public/static/index.html");
     struct variable *vars;
     if (strlen(head->path) == 1){
         vars = set_var("user_defined", "new user", NULL);
@@ -105,8 +105,8 @@ response* gen_response(char *recvd){
         vars = set_var("user_defined", (head->path+1), NULL);
     }
     set_var("website_defined", "testing", vars);
-    char *for_info = load_file("test.txt");
-    char *for_out = load_template_from_file("template_list.html", for_info);
+    char *for_info = load_file("./public/static/test.txt");
+    char *for_out = load_template_from_file("./public/static/template_list.html", for_info);
     set_var("for_test", for_out, vars);
     char *res = setup_vars(out_html, vars);
     free(for_out);

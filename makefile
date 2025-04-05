@@ -1,2 +1,2 @@
-server: server.c header_parser.c html_variables.c
-	gcc -o server server.c header_parser.c html_variables.c
+server: src/server.c src/header_parser.c src/html_variables.c
+	gcc -o server src/server.c src/header_parser.c src/html_variables.c
