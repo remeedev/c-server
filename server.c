@@ -169,6 +169,7 @@ void setup_options(int socket_fd){
 }
 
 int main(int argc, char *argv[]){
+    printf("Starting server!\n");
     // Basic setup for server
     int socket_fd;
     struct addrinfo *self_addr = get_def_addr();
