@@ -179,7 +179,7 @@ char *load_file(char *file_name){
     FILE *file= fopen(file_name, "r");
     if (file == NULL){
         printf("[%s] does not exist!\n", file_name);
-        return "";
+        return NULL;
     }
 
     long file_size;

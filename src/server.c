@@ -94,30 +94,191 @@ char* load_html(char* file_name){
     return return_text;
 }
 
+char* load_image_info(char *image_path, long *size_out){
+    FILE *file = fopen(image_path, "rb");
+    if (file == NULL){
+        printf("[%s] was not found!\n", image_path);
+        return NULL;
+    }
+    long file_size;
+    fseek(file, 0L, SEEK_END);
+    file_size = ftell(file);
+    rewind(file);
+    if (file_size <= 0){
+        printf("empty or invalid image!\n");
+        fclose(file);
+        return NULL;
+    }
+    char *data = (char *)malloc(file_size);
+    if (data ==NULL){
+        printf("Error allocating memory for image!\n");
+        fclose(file);
+        return NULL;
+    }
+    size_t read_bytes = fread(data, 1, file_size, file);
+    fclose(file);
+    if (read_bytes != file_size){
+        printf("read [%zu] of [%zu] bytes\n", read_bytes, file_size);
+        return NULL;
+    }
+    *size_out = read_bytes;
+    return data; 
+}
+
+char *create_image_header(char *extension_type, char *image_information, long size, size_t *total_size){
+    if (strcmp(extension_type, "ico")==0){
+        char header[256];
+        snprintf(header, sizeof(header), 
+                 "HTTP/1.1 200 OK\r\n"
+                 "Content-Type: image/x-icon\r\n"
+                 "Content-Length: %ld\r\n"
+                 "Connection: close\r\n"
+                 "\r\n", size);
+        size_t header_len = strlen(header);
+        size_t net_size = header_len + size;
+        char * response = (char *)malloc(net_size);
+        if (response == NULL){
+            printf("Error allocating space for response!\n");
+            return "";
+        }
+        memcpy(response, header, header_len);
+        memcpy(response+header_len, image_information, size);
+        *total_size = net_size;
+        return response;
+    }
+    return "";
+}
+
 response* gen_response(char *recvd){
     response* out = (response *)malloc(sizeof(response));
     request_header* head = parse_header(recvd);
-    char *out_html = load_html("./public/static/index.html");
-    struct variable *vars;
-    if (strlen(head->path) == 1){
-        vars = set_var("user_defined", "new user", NULL);
-    }else{
-        vars = set_var("user_defined", (head->path+1), NULL);
+    if (strcmp(head->path, "/") == 0){
+        char *out_html = load_html("./public/static/index.html");
+        struct variable *vars;
+        if (strlen(head->path) == 1){
+            vars = set_var("user_defined", "new user", NULL);
+        }else{
+            vars = set_var("user_defined", (head->path+1), NULL);
+        }
+        set_var("website_defined", "testing", vars);
+        char *for_info = load_file("./public/static/test.txt");
+        char *for_out = load_template_from_file("./public/static/template_list.html", for_info);
+        set_var("for_test", for_out, vars);
+        char *res = setup_vars(out_html, vars);
+        free(for_out);
+        free(for_info);
+        out->response_size = strlen(res);
+        out->out_msg = (char *)malloc(strlen(res)+1);
+        strcpy(out->out_msg, res);
+        free(res);
+        free_all_vars(vars);
+        free(out_html);
+        free_header(head);
+        return out;
     }
-    set_var("website_defined", "testing", vars);
-    char *for_info = load_file("./public/static/test.txt");
-    char *for_out = load_template_from_file("./public/static/template_list.html", for_info);
-    set_var("for_test", for_out, vars);
-    char *res = setup_vars(out_html, vars);
-    free(for_out);
-    free(for_info);
-    free_all_vars(vars);
-    out->response_size = strlen(res);
-    out->out_msg = (char *)malloc(strlen(res)+1);
-    strcpy(out->out_msg, res);
-    free(res);
+    bool extension = false;
+    bool path_f = false;
+    int curr_pos = 0;
+    int period_pos = -1;
+    size_t n_size = 0;
+    size_t x_size = 0;
+    while (head->path[curr_pos] != '\0' && !path_f){
+        if (head->path[curr_pos] == '.'){
+            extension = true;
+            period_pos = curr_pos;
+        }
+        if (head->path[curr_pos] == '/' && curr_pos != 0){
+            path_f = true;
+        }else{
+            if (extension && head->path[curr_pos] != '.'){
+                x_size++;
+            }else{
+                if (extension == false && head->path[curr_pos] != '/'){
+                    n_size++;
+                }
+            }
+        }
+        curr_pos++;
+    }
+    if (extension){
+        char *comp_ext = (char *)malloc(x_size+1);
+        int start = period_pos+1;
+        int _i = 0;
+        while(head->path[start] != '/' && head->path[start] != '\0'){
+            comp_ext[_i] = head->path[start];
+            _i++;
+            start++;
+        }
+        comp_ext[_i] = '\0';
+        if (strcmp(comp_ext, "ico")==0){
+            char *image_path = "./public/images";
+            char *full_path = (char *)malloc(strlen(image_path)+strlen(head->path)+1);
+            strcpy(full_path, image_path);
+            strcat(full_path, head->path);
+            long image_size;
+            char *image_info = load_image_info(full_path, &image_size);
+            if (image_info == NULL){
+                char *msg = (char *)malloc(strlen(full_path)+strlen("[] couldn't be found!")+1);
+                sprintf(msg, "[%s] couldn't be found!", full_path);
+                out->response_size = strlen(msg);
+                out->out_msg = (char *)malloc(strlen(msg)+1);
+                strcpy(out->out_msg, msg);
+                free(full_path);
+                free(comp_ext);
+                free_header(head);
+                return out;
+            }
+            size_t out_size;
+            char *out_msg = create_image_header(comp_ext, image_info, image_size, &out_size);
+            out->response_size = out_size;
+            out->out_msg = out_msg;
+            free(image_info);
+            free(full_path);
+            free(comp_ext);
+            free_header(head);
+            return out;
+        }
+        if (strcmp(comp_ext, "css") == 0){
+            char *file_path = "./public/style";
+            char *full_path = (char *)malloc(strlen(file_path)+strlen(head->path)+1);
+            strcpy(full_path, file_path);
+            strcat(full_path, head->path);
+            char *file_info = load_file(full_path);
+            if (file_info == NULL){
+                char *msg = (char *)malloc(strlen(full_path)+strlen("[] couldn't be found!")+1);
+                sprintf(msg, "[%s] couldn't be found!", full_path);
+                out->response_size = strlen(msg);
+                out->out_msg = (char *)malloc(strlen(msg)+1);
+                strcpy(out->out_msg, msg);
+                free(full_path);
+                free(comp_ext);
+                free_header(head);
+                return out;
+            }
+            char header[256];
+            snprintf(header, sizeof(header),
+                     "HTTP/1.1 200 OK\r\n"
+                     "Content-Type:text/css\r\n"
+                     "Content-Length:%zu\r\n"
+                     "Connection: close\r\n\r\n", strlen(file_info));
+            size_t total_size = strlen(file_info)+strlen(header)+1;
+            char *return_list = (char *)malloc(total_size);
+            strcpy(return_list, header);
+            strcat(return_list, file_info);
+            out->response_size = total_size;
+            out->out_msg = return_list;
+            free(full_path);
+            free(file_info);
+            free(comp_ext);
+            free_header(head);
+            return out;
+        }
+        free(comp_ext);
+    }
+    out->response_size = 4;
+    out->out_msg = (char *)malloc(5);
+    strcpy(out->out_msg, "pene");
     free_header(head);
-    free(out_html);
     return out;
 }
 
