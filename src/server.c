@@ -389,6 +389,7 @@ int main(int argc, char *argv[]){
     assure_bind(socket_fd, self_addr);
     start_listening(socket_fd);
     printf("Listening in on port [%d]\n", PORT);
+    printf("Server Link: http://localhost:%d\n", PORT);
 
     // receiving information
     bool running = true;
