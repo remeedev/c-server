@@ -5,7 +5,8 @@ let link_list = [
     "/non-supported.gif",
     "/favicon.ico",
     "/index.js",
-    "/style.css"
+    "/style.css",
+    "/test.txt"
 ]
 
 for (let i = 0; i < link_list.length; i++){

@@ -260,8 +260,8 @@ response* gen_response(char *recvd){
         }
         comp_ext[_i] = '\0';
         char *full_path;
-        char *path_alloc[] = {"ico", "css", "js", NULL};
-        char *paths[] = {"./public/images", "./public/style", "./public/scripts", NULL};
+        char *path_alloc[] = {"ico", "css", "js", "txt", NULL};
+        char *paths[] = {"./public/images", "./public/style", "./public/scripts", "./public/static", NULL};
         char *temporary_path = NULL;
         bool found = false;
         int pos = 0;
