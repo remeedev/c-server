@@ -7,4 +7,21 @@ body {
     background-color: #121512;
     color: #FEFEFE;
     font-family: sans-serif;
+    width: 100vw;
+    height: 100vh;
+}
+
+div {
+    background-color: #252525;
+    width: 25%;
+    aspect-ratio: 5/1;
+    border-radius: 25px;
+    padding: 10px;
+    margin: 10px auto;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+div:hover {
+    background-color: #454545;
 }

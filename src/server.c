@@ -60,40 +60,6 @@ typedef struct{
     size_t response_size;
 } response;
 
-char* load_html(char* file_name){
-    FILE *html_file = fopen(file_name, "r");
-    char *html_header = "HTTP/1.1 200 OK\r\nContent-Type=text/html; charset=utf-8\r\n\r\n";
-    if (html_file == NULL){
-        char *error = "Webpage was not found!";
-        printf("[%s] file was not found!\n", file_name);
-        return error;
-    }
-    long f_size;
-    fseek(html_file, 0L, SEEK_END);
-    f_size = ftell(html_file);
-    rewind(html_file);
-
-    char *file_text = (char *)malloc(f_size+1);
-    if (file_text == NULL){
-        fclose(html_file);
-        printf("Error allocation memory reading [%s] file!\n", file_name);
-        return "";
-    }
-    memset(file_text, 0, f_size+1);
-    if(1!=fread(file_text, f_size, 1, html_file)){
-        printf("Error reading the file contents!\n");
-        free(file_text);
-        fclose(html_file);
-        return "";
-    }
-    char *return_text = (char *)malloc(f_size + strlen(html_header) + 1);
-    strcpy(return_text, html_header);
-    strcat(return_text, file_text);
-    fclose(html_file);
-    free(file_text);
-    return return_text;
-}
-
 char* load_image_info(char *image_path, long *size_out){
     FILE *file = fopen(image_path, "rb");
     if (file == NULL){
@@ -149,11 +115,94 @@ char *create_image_header(char *extension_type, char *image_information, long si
     return "";
 }
 
+char *plaintext_response(char *text){
+    char header_buff[512];
+    snprintf(header_buff, sizeof(header_buff), 
+             "HTTP/1.1 200 OK\r\n"
+             "Content-Type:text/plain\r\n"
+             "Content-Length: %zu\r\n"
+             "Connection: close\r\n"
+             "\r\n", strlen(text));
+    char *out = (char *)malloc(strlen(text)+strlen(header_buff)+1);
+    strcpy(out, header_buff);
+    strcat(out, text);
+    return out;
+}
+
+char *load_content(char *content, char *extension){
+    char *extensions[] = {"css", "txt", "js", "html", NULL};
+    char *MIME[] = {"text/css", "text/plain", "text/javascript", "text/html", NULL};
+    char *mime_out = NULL;
+    int pos = 0;
+    while (extensions[pos] != NULL){
+        if (strcmp(extension, extensions[pos]) == 0){
+            mime_out = MIME[pos];
+        }
+        pos++;
+    }
+    if (mime_out == NULL){
+        return NULL;
+    }
+    char header_buff[512];
+    snprintf(header_buff, sizeof(header_buff),
+             "HTTP/1.1 200 OK\r\n"
+             "Content-Type:%s\r\n"
+             "Content-Length:%zu\r\n"
+             "Connection: close\r\n"
+             "\r\n", mime_out, strlen(content));
+    size_t total_size = strlen(content)+strlen(header_buff)+1;
+    char *out = (char *)malloc(total_size);
+    if (out == NULL){
+        return NULL;
+    }
+    memset(out, 0, total_size);
+    strcpy(out, header_buff);
+    strcat(out, content);
+    return out;
+}
+
+char *load_text_file(char *file_name, char *extension){
+    char  *check = load_content("", extension);
+    if (check == NULL){
+        return NULL;
+    }
+    free(check);
+    FILE *file = fopen(file_name, "r");
+    if (file == NULL){
+        char buff[100];
+        snprintf(buff, sizeof(buff), "[%s] was not found or was wrongly opened!", file_name);
+        return plaintext_response(buff);
+    }
+    fseek(file, 0L, SEEK_END);
+    long file_size = ftell(file);
+    rewind(file);
+
+    char *in_text = (char *)malloc(file_size+1);
+    if (in_text == NULL){
+        printf("Error allocating memory for text!");
+        fclose(file);
+        return plaintext_response("Error allocating memory for text!");
+    }
+    memset(in_text, 0, file_size);
+    if(1!=fread(in_text, file_size, 1, file)){
+        printf("Error reading the file contents!\n");
+        free(in_text);
+        fclose(file);
+        return plaintext_response("Error reading file contents!");
+    }
+    in_text[file_size] = '\0';
+    char *out = load_content(in_text, extension);
+    free(in_text);
+    fclose(file);
+    return out;
+}
+
 response* gen_response(char *recvd){
     response* out = (response *)malloc(sizeof(response));
     request_header* head = parse_header(recvd);
+    //printf("[%s] requested!\n", head->path);
     if (strcmp(head->path, "/") == 0){
-        char *out_html = load_html("./public/static/index.html");
+        char *out_html = load_file("./public/static/index.html");
         struct variable *vars;
         if (strlen(head->path) == 1){
             vars = set_var("user_defined", "new user", NULL);
@@ -164,13 +213,13 @@ response* gen_response(char *recvd){
         char *for_info = load_file("./public/static/test.txt");
         char *for_out = load_template_from_file("./public/static/template_list.html", for_info);
         set_var("for_test", for_out, vars);
-        char *res = setup_vars(out_html, vars);
+        char *_res = setup_vars(out_html, vars);
+        char *res = load_content(_res, "html");
+        free(_res);
+        out->response_size = strlen(res);
+        out->out_msg = res;
         free(for_out);
         free(for_info);
-        out->response_size = strlen(res);
-        out->out_msg = (char *)malloc(strlen(res)+1);
-        strcpy(out->out_msg, res);
-        free(res);
         free_all_vars(vars);
         free(out_html);
         free_header(head);
@@ -210,21 +259,57 @@ response* gen_response(char *recvd){
             start++;
         }
         comp_ext[_i] = '\0';
+        char *full_path;
+        char *path_alloc[] = {"ico", "css", "js", NULL};
+        char *paths[] = {"./public/images", "./public/style", "./public/scripts", NULL};
+        char *temporary_path = NULL;
+        bool found = false;
+        int pos = 0;
+        while (path_alloc[pos] != NULL && !found){
+            if (strcmp(comp_ext, path_alloc[pos]) == 0){
+                temporary_path = (char *)malloc(strlen(paths[pos]) + strlen(head->path) +1);
+                if (temporary_path == NULL){
+                    printf("Not able to allocate memory for path!\n");
+                    out->out_msg = plaintext_response("Not able to allocate memory for path!");
+                    out->response_size = strlen(out->out_msg);
+                    free_header(head);
+                    free(comp_ext);
+                    return out;
+                }
+                strcpy(temporary_path, paths[pos]);
+                strcat(temporary_path, head->path);
+                found = true;
+            }
+            pos++;
+        }
+        if (temporary_path == NULL){
+            out->out_msg = plaintext_response("File path not supported!");
+            out->response_size = strlen(out->out_msg);
+            free_header(head);
+            free(comp_ext);
+            return out;
+        }
+        char *response_text = load_text_file(temporary_path, comp_ext);
+        if (response_text != NULL){
+            out->out_msg = response_text;
+            out->response_size = strlen(out->out_msg);
+            free(comp_ext);
+            free_header(head);
+            free(temporary_path);
+            return out;
+        }
         if (strcmp(comp_ext, "ico")==0){
-            char *image_path = "./public/images";
-            char *full_path = (char *)malloc(strlen(image_path)+strlen(head->path)+1);
-            strcpy(full_path, image_path);
-            strcat(full_path, head->path);
+            char *full_path = temporary_path;
             long image_size;
             char *image_info = load_image_info(full_path, &image_size);
             if (image_info == NULL){
                 char *msg = (char *)malloc(strlen(full_path)+strlen("[] couldn't be found!")+1);
                 sprintf(msg, "[%s] couldn't be found!", full_path);
-                out->response_size = strlen(msg);
-                out->out_msg = (char *)malloc(strlen(msg)+1);
-                strcpy(out->out_msg, msg);
+                out->out_msg = plaintext_response(msg);
+                out->response_size = strlen(out->out_msg);
                 free(full_path);
                 free(comp_ext);
+                free(msg);
                 free_header(head);
                 return out;
             }
@@ -238,81 +323,11 @@ response* gen_response(char *recvd){
             free_header(head);
             return out;
         }
-        if (strcmp(comp_ext, "css") == 0){
-            char *file_path = "./public/style";
-            char *full_path = (char *)malloc(strlen(file_path)+strlen(head->path)+1);
-            strcpy(full_path, file_path);
-            strcat(full_path, head->path);
-            char *file_info = load_file(full_path);
-            if (file_info == NULL){
-                char *msg = (char *)malloc(strlen(full_path)+strlen("[] couldn't be found!")+1);
-                sprintf(msg, "[%s] couldn't be found!", full_path);
-                out->response_size = strlen(msg);
-                out->out_msg = (char *)malloc(strlen(msg)+1);
-                strcpy(out->out_msg, msg);
-                free(full_path);
-                free(comp_ext);
-                free_header(head);
-                return out;
-            }
-            char header[256];
-            snprintf(header, sizeof(header),
-                     "HTTP/1.1 200 OK\r\n"
-                     "Content-Type:text/css\r\n"
-                     "Content-Length:%zu\r\n"
-                     "Connection: close\r\n\r\n", strlen(file_info));
-            size_t total_size = strlen(file_info)+strlen(header)+1;
-            char *return_list = (char *)malloc(total_size);
-            strcpy(return_list, header);
-            strcat(return_list, file_info);
-            out->response_size = total_size;
-            out->out_msg = return_list;
-            free(full_path);
-            free(file_info);
-            free(comp_ext);
-            free_header(head);
-            return out;
-        }
-        if (strcmp(comp_ext, "js") == 0){
-            char *file_path = "./public/scripts";
-            char *full_path = (char *)malloc(strlen(file_path)+strlen(head->path)+1);
-            strcpy(full_path, file_path);
-            strcat(full_path, head->path);
-            char *file_info = load_file(full_path);
-            if (file_info == NULL){
-                char *msg = (char *)malloc(strlen(full_path)+strlen("[] couldn't be found!")+1);
-                sprintf(msg, "[%s] couldn't be found!", full_path);
-                out->response_size = strlen(msg);
-                out->out_msg = (char *)malloc(strlen(msg)+1);
-                strcpy(out->out_msg, msg);
-                free(full_path);
-                free(comp_ext);
-                free_header(head);
-                return out;
-            }
-            char header[256];
-            snprintf(header, sizeof(header),
-                     "HTTP/1.1 200 OK\r\n"
-                     "Content-Type:text/javascript\r\n"
-                     "Content-Length:%zu\r\n"
-                     "Connection: close\r\n\r\n", strlen(file_info));
-            size_t total_size = strlen(file_info)+strlen(header)+1;
-            char *return_list = (char *)malloc(total_size);
-            strcpy(return_list, header);
-            strcat(return_list, file_info);
-            out->response_size = total_size;
-            out->out_msg = return_list;
-            free(full_path);
-            free(file_info);
-            free(comp_ext);
-            free_header(head);
-            return out;
-        }
+        
         free(comp_ext);
     }
-    out->response_size = 4;
-    out->out_msg = (char *)malloc(5);
-    strcpy(out->out_msg, "test");
+    out->out_msg = plaintext_response("Path not able to be redirected!");
+    out->response_size = strlen(out->out_msg);
     free_header(head);
     return out;
 }
@@ -377,11 +392,20 @@ int main(int argc, char *argv[]){
 
     // receiving information
     bool running = true;
+    int count = 0;
+    int max_count;
     while (running){
         receive_first(socket_fd);
         if (argc == 2){
             if (strcmp(argv[1], "once") == 0){
                 running = false;
+            }else{
+                count++;
+                printf("Request %d fulfilled!\n", count);
+                max_count = atoi(argv[1]);
+                if (count >= max_count){
+                    running = false;
+                }
             }
         }
     }

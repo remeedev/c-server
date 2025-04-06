@@ -6,3 +6,6 @@ text:both items should be added to the end result of the webpage
 
 title:test3
 text:More information to be added dynamically
+
+title:Update 1.1
+text:everything looks nice!
