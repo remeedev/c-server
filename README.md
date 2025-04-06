@@ -1,11 +1,7 @@
 # C_Server
 
-<span style="background-color: black; border-radius: 10px; padding: 5px; color: snow; font-weight: bolder; margin:10px;">
-Development Status: <span style="color: lightgreen">In development</span>
-</span>
-<span style="background-color: black; border-radius: 10px; padding: 5px; color: snow; font-weight: bolder; margin:10px;">
-Version Number: <span style="color: yellow">0.1</span>
-</span>
+![development](https://img.shields.io/badge/Development_Status-In_Development-green)
+![version](https://img.shields.io/badge/Version_Number-0.1-yellow)
 
 **I am currently learning the language.**
 
