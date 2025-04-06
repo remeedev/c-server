@@ -1,7 +1,7 @@
 # C_Server
 
-![development](https://img.shields.io/badge/Development_Status-In_Development-green)
-![version](https://img.shields.io/badge/Version_Number-0.1-yellow)
+![development](https://img.shields.io/badge/Development_Status-In_Development-green?style=flat)
+![version](https://img.shields.io/badge/Version_Number-0.1-yellow?style=flat)
 
 **I am currently learning the language.**
 
