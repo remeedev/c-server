@@ -273,11 +273,46 @@ response* gen_response(char *recvd){
             free_header(head);
             return out;
         }
+        if (strcmp(comp_ext, "js") == 0){
+            char *file_path = "./public/scripts";
+            char *full_path = (char *)malloc(strlen(file_path)+strlen(head->path)+1);
+            strcpy(full_path, file_path);
+            strcat(full_path, head->path);
+            char *file_info = load_file(full_path);
+            if (file_info == NULL){
+                char *msg = (char *)malloc(strlen(full_path)+strlen("[] couldn't be found!")+1);
+                sprintf(msg, "[%s] couldn't be found!", full_path);
+                out->response_size = strlen(msg);
+                out->out_msg = (char *)malloc(strlen(msg)+1);
+                strcpy(out->out_msg, msg);
+                free(full_path);
+                free(comp_ext);
+                free_header(head);
+                return out;
+            }
+            char header[256];
+            snprintf(header, sizeof(header),
+                     "HTTP/1.1 200 OK\r\n"
+                     "Content-Type:text/javascript\r\n"
+                     "Content-Length:%zu\r\n"
+                     "Connection: close\r\n\r\n", strlen(file_info));
+            size_t total_size = strlen(file_info)+strlen(header)+1;
+            char *return_list = (char *)malloc(total_size);
+            strcpy(return_list, header);
+            strcat(return_list, file_info);
+            out->response_size = total_size;
+            out->out_msg = return_list;
+            free(full_path);
+            free(file_info);
+            free(comp_ext);
+            free_header(head);
+            return out;
+        }
         free(comp_ext);
     }
     out->response_size = 4;
     out->out_msg = (char *)malloc(5);
-    strcpy(out->out_msg, "pene");
+    strcpy(out->out_msg, "test");
     free_header(head);
     return out;
 }
