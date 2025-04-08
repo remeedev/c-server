@@ -2,6 +2,8 @@
 #include <dirent.h>
 #include <stdlib.h>
 
+void add_files(){}
+
 int main(int argc, char *argv[]){
     DIR *files = opendir("./files");
     if (files == NULL){
@@ -10,11 +12,10 @@ int main(int argc, char *argv[]){
     }
     struct dirent* file_info;
     while ((file_info = readdir(files)) != NULL){
-        if (file_info->d_name[0] == '.'){
-            printf("Ignoring file...\n");
-        }else{
+        if (file_info->d_name[0] != '.'){
             printf("File found: %s\n", file_info->d_name);
         }
     }
+    closedir(files);
     return 0;
 }

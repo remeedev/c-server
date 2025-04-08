@@ -1,3 +1,4 @@
 server
 db/data.db
 db/db
+files/*
