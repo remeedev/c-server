@@ -5,14 +5,11 @@
 #include <time.h>
 
 sqlite3 *prepare_table(){
-    FILE *db_file = fopen("data.db", "r");
-    if (db_file == NULL){
-        printf("Database file is non-existent, creating file!\n");
-        db_file = fopen("data.db", "w");
-    }
-    fclose(db_file);
     sqlite3 *db;
-    sqlite3_open("data.db", &db);
+    if (sqlite3_open("./db/data.db", &db) != SQLITE_OK){
+        printf("Error creating/opening the database!\n");
+        exit(1);
+    }
     if (db == NULL){
         printf("Memory allocation error for db!\n");
         exit(1);
@@ -38,6 +35,7 @@ sqlite3_stmt *run_func(sqlite3 *db, char *stmt){
             printf("Busy!\n");
         }
         if (res == SQLITE_MISUSE){
+            printf("Error: %s\n", sqlite3_errmsg(db));
             printf("Misuse!\n");
         }
         exit(1);
@@ -60,6 +58,7 @@ void create_user(sqlite3 *db, char *username, char* pass){
         sqlite3_stmt *get_user = run_func(db, check_stmt);
         char uid[5];
         int user_id_raw = sqlite3_column_int(get_user, 0);
+        sqlite3_finalize(get_user);
         sprintf(uid, "%d", user_id_raw);
         time_t seconds = time(NULL);
         char time_since[15];
@@ -70,6 +69,36 @@ void create_user(sqlite3 *db, char *username, char* pass){
         run_func(db, raw_stmt);
         free(raw_stmt);
     }
+    sqlite3_finalize(check_exists);
+    free(check_stmt);
+    free(stmt);
+}
+
+void create_file(sqlite3 *db, char *path, char *name){
+    char *new_file = "INSERT INTO files (name, path) VALUES ('%s', '%s')";
+    char *stmt = (char *)malloc(strlen(path)+strlen(name)+strlen(new_file)-3);
+    sprintf(stmt, new_file, name, path);
+    char *check = "SELECT * FROM files WHERE name = '%s' AND path = '%s'";
+    char *check_stmt = (char *)malloc(strlen(check)+strlen(name)+strlen(path)-3);
+    sprintf(check_stmt, check, name, path);
+    sqlite3_stmt *check_exists = run_func(db, check_stmt);
+    if (check_exists == NULL){
+        run_func(db, stmt);
+        sqlite3_stmt *get_file = run_func(db, check_stmt);
+        char fid[10];
+        int file_id_raw = sqlite3_column_int(get_file, 0);
+        sqlite3_finalize(get_file);
+        sprintf(fid, "%d", file_id_raw);
+        time_t seconds = time(NULL);
+        char time_since[15];
+        sprintf(time_since, "%ld", seconds);
+        char *update_log = "INSERT INTO file_log (file_id, action, time) VALUES (%s, 0, %s)";
+        char *raw_stmt = (char *)malloc(strlen(update_log)-3+strlen(time_since)+strlen(fid));
+        sprintf(raw_stmt, update_log, fid, time_since);
+        run_func(db, raw_stmt);
+        free(raw_stmt);
+    }
+    sqlite3_finalize(check_exists);
     free(check_stmt);
     free(stmt);
 }
@@ -83,13 +112,5 @@ void setup(sqlite3 *db){
     run_func(db, create_files);
     run_func(db, create_log_file);
     run_func(db, create_log_user);
-    //sqlite3_stmt *pc = run_func(db, "SELECT * FROM users WHERE ");
     create_user(db, "testing", "password");
-}
-
-int main(int argc, char *argv[]){
-    sqlite3 *db = prepare_table();
-    setup(db);
-    sqlite3_close(db);
-    return 0;
 }

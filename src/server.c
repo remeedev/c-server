@@ -10,7 +10,7 @@
 #include "h_vars.h"
 
 #define PORT 3000
-#define BACKLOG 10
+#define BACKLOG 3 
 
 struct addrinfo *get_def_addr(){
     struct addrinfo *self_addr;
@@ -360,10 +360,13 @@ void receive_first(int socket_fd){
         return;
     }
     response *res = gen_response(recvd);
-
-    if (send(new_fd, res->out_msg, res->response_size, 0) == -1){
-        printf("Error sending response!\n");
-        exit(1);
+    if (!fork()){
+        close(socket_fd);
+        if (send(new_fd, res->out_msg, res->response_size, 0) == -1){
+            printf("Error sending response!\n");
+            exit(1);
+        }
+        exit(0);
     }
     free_response(res);
 
