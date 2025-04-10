@@ -74,10 +74,12 @@ void create_user(sqlite3 *db, char *username, char* pass){
     free(stmt);
 }
 
-void create_file(sqlite3 *db, char *path, char *name){
-    char *new_file = "INSERT INTO files (name, path) VALUES ('%s', '%s')";
-    char *stmt = (char *)malloc(strlen(path)+strlen(name)+strlen(new_file)-3);
-    sprintf(stmt, new_file, name, path);
+void create_file(sqlite3 *db, char *path, char *name, int uid){
+    char *new_file = "INSERT INTO files (name, path, added_by) VALUES ('%s', '%s', %d)";
+    char uid_buff[10];
+    sprintf(uid_buff, "%d", uid);
+    char *stmt = (char *)malloc(strlen(path)+strlen(name)+strlen(new_file)-5+strlen(uid_buff));
+    sprintf(stmt, new_file, name, path, uid);
     char *check = "SELECT * FROM files WHERE name = '%s' AND path = '%s'";
     char *check_stmt = (char *)malloc(strlen(check)+strlen(name)+strlen(path)-3);
     sprintf(check_stmt, check, name, path);
@@ -101,6 +103,10 @@ void create_file(sqlite3 *db, char *path, char *name){
     sqlite3_finalize(check_exists);
     free(check_stmt);
     free(stmt);
+}
+
+void delete_file(sqlite3 *db, char *name, char *path){
+    printf("Deleting file [%s%s]!\n", path, name);
 }
 
 void setup(sqlite3 *db){

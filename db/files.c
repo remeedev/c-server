@@ -6,7 +6,7 @@
 #include <string.h>
 #include "db.h"
 
-bool file_in(sqlite3 *_db, char *name, char *path){
+bool file_in_db(sqlite3 *_db, char *name, char *path){
     char *full_path = (char *)malloc(strlen(name)+strlen(path)+8);
     sprintf(full_path, "./files%s%s", path, name);
     char *find_cmd = "SELECT path, name FROM files WHERE name = '%s' AND path = '%s'";
@@ -35,6 +35,18 @@ bool file_in(sqlite3 *_db, char *name, char *path){
     return found;
 }
 
+bool file_in_fs(char *name, char* path){
+    char *full_path = (char *)malloc(strlen(name)+strlen(path)+8);
+    sprintf(full_path, "./files%s%s", path, name);
+    FILE *file = fopen(full_path, "r");
+    free(full_path);
+    if (file == NULL){
+        return false;
+    }
+    fclose(file);
+    return true;
+}
+
 void update_files(sqlite3 *_db){
     DIR *files = opendir("./files");
     if (files == NULL){
@@ -45,15 +57,26 @@ void update_files(sqlite3 *_db){
     struct dirent* file_info;
     while ((file_info = readdir(files)) != NULL){
         if (file_info->d_name[0] != '.'){
-            if (file_in(_db, file_info->d_name, path) == false){
+            if (file_in_db(_db, file_info->d_name, path) == false){
                 char *full_path = (char *)malloc(strlen(file_info->d_name)+strlen(path)+1);
                 sprintf(full_path, "%s%s", path, file_info->d_name);
                 printf("[%s] : file not registered in db!\n", full_path);
-                create_file(_db, path, file_info->d_name);
+                create_file(_db, path, file_info->d_name, 1);
                 free(full_path);
             }
         }
     }
+    sqlite3_stmt *files_logged = run_func(_db, "SELECT path, name FROM files");
+    int res = SQLITE_ROW;
+    while (files_logged != NULL && res==SQLITE_ROW){
+        const unsigned char* file_path = sqlite3_column_text(files_logged, 0);
+        const unsigned char* file_name = sqlite3_column_text(files_logged, 1);
+        if (!file_in_fs((char *)file_name, (char *)file_path)){
+            delete_file(_db, (char *)file_name, (char *)file_path);
+        }
+        res = sqlite3_step(files_logged);
+    }
+    sqlite3_finalize(files_logged);
     closedir(files);
 }
 
