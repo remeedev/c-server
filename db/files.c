@@ -60,7 +60,6 @@ void update_files(sqlite3 *_db){
             if (file_in_db(_db, file_info->d_name, path) == false){
                 char *full_path = (char *)malloc(strlen(file_info->d_name)+strlen(path)+1);
                 sprintf(full_path, "%s%s", path, file_info->d_name);
-                printf("[%s] : file not registered in db!\n", full_path);
                 create_file(_db, path, file_info->d_name, 1);
                 free(full_path);
             }

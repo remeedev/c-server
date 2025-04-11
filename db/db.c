@@ -94,9 +94,9 @@ void create_file(sqlite3 *db, char *path, char *name, int uid){
         time_t seconds = time(NULL);
         char time_since[15];
         sprintf(time_since, "%ld", seconds);
-        char *update_log = "INSERT INTO file_log (file_id, action, time) VALUES (%s, 0, %s)";
-        char *raw_stmt = (char *)malloc(strlen(update_log)-3+strlen(time_since)+strlen(fid));
-        sprintf(raw_stmt, update_log, fid, time_since);
+        char *update_log = "INSERT INTO file_log (file_id, full_path, action, time) VALUES (%s, '%s%s', 0, %s)";
+        char *raw_stmt = (char *)malloc(strlen(update_log)-7+strlen(name)+strlen(path)+strlen(time_since)+strlen(fid));
+        sprintf(raw_stmt, update_log, fid, path, name, time_since);
         run_func(db, raw_stmt);
         free(raw_stmt);
     }
@@ -105,14 +105,42 @@ void create_file(sqlite3 *db, char *path, char *name, int uid){
     free(stmt);
 }
 
+int get_table_count(sqlite3 *db, char *table){
+    char *query_raw = "SELECT count(*) FROM %s";
+    char *query_prcsd = (char *)malloc(strlen(query_raw)-1+strlen(table));
+    sprintf(query_prcsd, query_raw, table);
+    sqlite3_stmt *query = run_func(db, query_prcsd);
+    int count = sqlite3_column_int(query, 0);
+    printf("Count [%d]\n", count);
+    free(query_prcsd);
+    sqlite3_finalize(query);
+    return count;
+}
+
 void delete_file(sqlite3 *db, char *name, char *path){
-    printf("Deleting file [%s%s]!\n", path, name);
+    int prev_count = get_table_count(db, "files");
+    char *statement = "DELETE FROM files WHERE name = '%s' AND path = '%s'";
+    char *parsed_stmt = (char *)malloc(strlen(statement)-3+strlen(name)+strlen(path));
+    sprintf(parsed_stmt, statement, name, path);
+    run_func(db, parsed_stmt);
+    int new_count = get_table_count(db, "files");
+    if (prev_count != new_count){
+        char *lstmt_raw = "INSERT INTO file_log (full_path, action, time) VALUES ('%s%s', 1, %s)";
+        time_t seconds = time(NULL);
+        char time_since[15];
+        sprintf(time_since, "%ld", seconds);
+        char *lstmt_prc = (char *)malloc(strlen(time_since)+strlen(path)+strlen(name)+strlen(lstmt_raw)-5);
+        sprintf(lstmt_prc, lstmt_raw, path, name, time_since);
+        run_func(db, lstmt_prc);
+        free(lstmt_prc);
+    }
+    free(parsed_stmt);
 }
 
 void setup(sqlite3 *db){
     char *create_users= "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT, pw TEXT, sessionKey TEXT)";
     char *create_files = "CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY, path TEXT, name TEXT, added_by INTEGER, last_edit INTEGER)";
-    char *create_log_file = "CREATE TABLE IF NOT EXISTS file_log (id INTEGER PRIMARY KEY, file_id INTEGER, action INTEGER, time INTEGER)";
+    char *create_log_file = "CREATE TABLE IF NOT EXISTS file_log (id INTEGER PRIMARY KEY, file_id INTEGER, full_path TEXT, action INTEGER, time INTEGER)";
     char *create_log_user = "CREATE TABLE IF NOT EXISTS user_log (id INTEGER PRIMARY KEY, user_id INTEGER, action INTEGER, time INTEGER)";
     run_func(db, create_users);
     run_func(db, create_files);
