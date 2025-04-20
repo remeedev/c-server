@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <openssl/sha.h>
 
 sqlite3 *prepare_table(){
     sqlite3 *db;

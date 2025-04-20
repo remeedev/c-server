@@ -1,4 +1,8 @@
 server
-db/data.db
+
+*.db
 db/db
+.*
+db/hash
+
 files/*
