@@ -7,9 +7,10 @@
 #define FILE_LENGTH 16
 #define SALT_LENGTH 16
 
-char* salt_file_name = ".salt.txt";
+char* salt_file_name = "./db/.salt.txt";
 
 char *gen_random_seq(int len){
+    srand(time(NULL));
     char *out = (char *)malloc(len);
     char *possible_letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     int i = 0;
@@ -50,6 +51,11 @@ char *check_setup(){
 }
 
 char *hash_pw(char *pw, char *salt){
+    bool changed_salt = false;
+    if (salt == NULL){
+        salt = check_setup();
+        changed_salt = true;
+    }
     char *salted_pw = (char *)malloc(strlen(pw)+strlen(salt)+1);
     sprintf(salted_pw, "%s%s", pw, salt);
     char *file_name = (char *)malloc(FILE_LENGTH+4);
@@ -63,6 +69,9 @@ char *hash_pw(char *pw, char *salt){
         printf("Error creating file!\n");
         free(file_name);
         free(salted_pw);
+        if (changed_salt){
+            free(salt);
+        }
         return "";
     }
     fprintf(content, "%s", salted_pw);
@@ -83,6 +92,9 @@ char *hash_pw(char *pw, char *salt){
         printf("Error deleting the file!\n");
     }
     free(file_name);
+    if (changed_salt){
+        free(salt);
+    }
     char *out = (char *)malloc(65);
     strcpy(out, buffer);
     return out;
@@ -95,33 +107,4 @@ bool compare_pw(char *raw_pw, char *hash){
     bool out = strcmp(compare_hash, hash)==0;
     free(compare_hash);
     return out;
-}
-
-int main(int argc, char *argv[]){
-    srand(time(NULL));
-    char *salt_created;
-    if (argc > 1){
-        if (strcmp(argv[1], "-c") == 0){
-            if (argc != 4){
-                printf("Usage:\n./hash -c <hash> <pw>\n");
-                return 1;
-            }
-            if (compare_pw(argv[3], argv[2])){
-                printf("Password and hash match!\n");
-            }else{
-                printf("Password and hash don't match!\n");
-            }
-            return 0;
-        }
-        int i = 1;
-        salt_created = check_setup();
-        while (i < argc){
-            char *hashed = hash_pw(argv[i], salt_created);
-            printf("Hashed pw %d: [%s]\n", i, hashed);
-            free(hashed);
-            i++;
-        }
-    }
-    free(salt_created);
-    return 0;
 }

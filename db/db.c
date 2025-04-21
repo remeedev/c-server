@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 #include <openssl/sha.h>
+#include "hash.h"
 
 sqlite3 *prepare_table(){
     sqlite3 *db;
@@ -46,10 +47,10 @@ sqlite3_stmt *run_func(sqlite3 *db, char *stmt){
 }
 
 void create_user(sqlite3 *db, char *username, char* pass){
-    // don't judge, I am going to add the hash function to the password, just not yet
+    char *hashed_pw = hash_pw(pass, NULL);
     char *new_user = "INSERT INTO users (name, pw) VALUES ('%s', '%s')";
-    char *stmt = (char *)malloc(strlen(username)+strlen(pass)+strlen(new_user)-3);
-    sprintf(stmt, new_user, username, pass);
+    char *stmt = (char *)malloc(strlen(username)+strlen(hashed_pw)+strlen(new_user)-3);
+    sprintf(stmt, new_user, username, hashed_pw);
     char *check = "SELECT * FROM users WHERE name = '%s'";
     char *check_stmt = (char *)malloc(strlen(check)+strlen(username)-1);
     sprintf(check_stmt, check, username);
